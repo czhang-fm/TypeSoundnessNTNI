@@ -1,1 +1,7 @@
-# TypeSoundnessNTNI
+# Type Soundness proof for Nontransitive Noninterference
+
+We present a soundness proof of a type system for the nontransitive noninterference (NTNI) information flow security property in an imperative programming language using Dafny. The original NTNI security property was defined for a functional programming language augmented with memory access operators, where security is defined as coarse-grained information flow policies over component-based software. Although the type system for NTNI has been extended by other authors, there is never a machine-checked sound proof for type-enforced NTNI so far, which yields insufficient confidence over the correctness of the type system that enforce security. 
+
+Dafny is a proof assistant designed for the verification of functional, imperative, and object-oriented programming languages. In this work, we encode program semantics, security policies, and type systems within the term algebras supported by Dafny, and following that, we verify the security requirements of any program that successfully passes type checking.
+
+This repository stores a machine-checked soundness proof of a type system for the nontransitive noninterference (NTNI) information flow security property in an imperative programming language using Dafny. The original NTNI security property was defined for a functional programming language augmented with memory access operators, where security policies are expressed as coarse-grained information flow constraints over component-based software. Although subsequent work has extended the NTNI type system, to the best of our knowledge, no prior work has provided a machine-checked soundness proof for type-enforced NTNI (up to September 2026). 
