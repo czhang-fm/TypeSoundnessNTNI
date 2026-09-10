@@ -8,8 +8,8 @@ module NTNISoundness {
     /** We prove the nontransitive information flow security is enforced by the type system
      *  NTNI security for program c:
      *  For all label l in labels, for all states M1 =CanFlow(l)= M2
-     *  (M1, c) ==>* (M1', Skip) /\ (M2, c) ==>* (M2, Skip)
-     *  we have M1 ={l}= M2
+     *  (M1, c) ==>* (M1', Skip) /\ (M2, c) ==>* (M2', Skip)
+     *  we have M1' ={l}= M2'
      *  This says the l component of a state can only be influenced by the components labeled by l'
      *  with (l', l) in flow as defined by the (global) security policy
      */
@@ -90,7 +90,6 @@ module NTNISoundness {
     // The second property: if x in g and that all variables appearing in e are also in g, then
     // given s1 =g= s2, s1 -- Assn(x, e) --> s1', and s2 -- Assn(x, e) --> s2'
     // we must have s1' =g= s2'
-    // lemma StepConsistency()
     lemma {:induction false} StepConsistency(vctx: VContext, vpc: set<Variable>, g: BaseType, s1: MState, s2: MState, s1': MState, s2': MState,x: Variable, e: Expr)
     requires vctx.Keys == s1.Keys == s2.Keys == s1'.Keys == s2'.Keys 
     requires validContext(vctx)
@@ -132,7 +131,6 @@ module NTNISoundness {
     requires vset <= variables 
     requires vpc <= variables
     requires VariablesInCmd(c) <= vctx.Keys 
-    // requires forall x :: x in vctx.Keys ==> vctx[x] <= variables // already covered by validContext
     requires forall y :: y in vpc ==> vctx[y] <= vpc // vpc is transitive
     requires HasCmdType(vctx, vpc, c) != Invalid
     ensures forall x, y :: x in vctx.Keys && x in MaxSet(vctx, vpc, c, vset * GetBaseType(HasCmdType(vctx, vpc, c))) && y in vctx[x] ==> 
@@ -156,7 +154,6 @@ module NTNISoundness {
     requires vpc <= vset // the control context is included in the set of variables in vset, need more properties (1,2,3) for vset
     requires VariablesInCmd(c) <= vctx.Keys 
     requires HasCmdType(vctx, vpc, c) != Invalid
-    //requires GetBaseType(HasCmdType(vctx, vpc, c)) <= g // the assigned value is from the set of variables in g
     requires forall x, y :: x in vset && y in vctx[x] ==> vctx[y] <= vctx[x] <= vset
     requires forall x, y :: x in vset && y in vctx[x] ==> coarse_label[y] in CanFlow(coarse_label[x])
     requires Equiv(vctx, vset, s1, s2)

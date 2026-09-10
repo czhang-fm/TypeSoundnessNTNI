@@ -178,29 +178,4 @@ module NontransitiveFlowType{
     requires HasCmdType(vctx, vpc, If(e, c1, c2)) != Invalid
     ensures HasCmdType(vctx, vpc + GetBaseType(HasExprType(vctx, e)), c1) != Invalid
     {}
-    /// Reflexivity and transitivity for vpc and vctx[x] for all x updated in the program, 
-    /// This needs to hold for all c that passes type checking
-    lemma ReflTrans(vctx: VContext, vpc: set<Variable>, c:Cmd)
-    requires policyTypeOK() && validContext(vctx)
-    requires vpc <= variables
-    requires VariablesInCmd(c) <= vctx.Keys 
-    requires forall x :: x in vctx.Keys ==> vctx[x] <= variables
-    requires forall y :: y in vpc ==> vctx[y] <= vpc // this should hold as an IH
-    requires HasCmdType(vctx, vpc, c) != Invalid
-    ensures forall x :: x in GetBaseType(HasCmdType(vctx, vpc, c)) ==> x in vctx[x]
-    ensures forall x, y :: x in GetBaseType(HasCmdType(vctx, vpc, c)) && y in vctx[x] ==> vctx[y] <= vctx[x]
-    decreases c
-    {
-        match c {
-            case Skip => // termination, trivial
-            case Assn(x, e) => // assignment
-                assert {x} == GetBaseType(HasCmdType(vctx, vpc, c));              
-            case If(e, c1, c2) => // if-then-else
-                var vpce := GetBaseType(HasExprType(vctx, e));
-                assert forall y :: y in vpce ==> vctx[y] <= vpce;
-                ReflTrans(vctx, vpc + vpce, c1);
-            case While(e, c1) => // while-loop
-            case Seq(c1, c2) => // sequential composition
-        }
-    }
 }

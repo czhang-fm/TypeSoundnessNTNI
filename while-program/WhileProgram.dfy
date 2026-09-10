@@ -138,7 +138,7 @@ module WhileProgram{
         }
     }
     // One step termination: after a small step, the remaining program terminates
-    // The proof of this lemma may be significantly simplified ... later
+    // The proof of this lemma has been simplified by the use of the TransitionSmallStep function
     lemma {:induction false} SmallStepTermination(s1: MState, s2: MState, c: Cmd, k: int) returns (s': MState, c': Cmd)
     requires typeOK(s1) && typeOK(s2) && k >= 0
     requires VariablesInCmd(c) <= s1.Keys == s2.Keys
@@ -149,50 +149,6 @@ module WhileProgram{
     ensures VariablesInCmd(c') <= s'.Keys == s2.Keys
     ensures Terminates(c', s', s2, k-1)
     {
-        // match c {
-        //     case Skip => // already termination
-        //         assert false;
-        //     case Assn(x, e) => // assignment
-        //         s', c' := s1[x:= Evaluate(s1, e)], Skip;
-        //         assert typeOK(s');
-        //         assert VariablesInCmd(c') <= s'.Keys == s2.Keys;
-        //         assert k >= 1;
-        //         assert Terminates(c', s', s2, k-1); assert s2 == s';
-        //     case If(e, c1, c2) => // if-then-else
-        //         var res := Evaluate(s1, e);
-        //         if (res != 0){
-        //             s', c' := s1, c1;
-        //         } else {
-        //             s', c' := s1, c2;
-        //         }
-        //         assert typeOK(s');
-        //         assert k >= 1;
-        //     case While(e, c1) => // while-loop
-        //         var res := Evaluate(s1, e);
-        //         if (res != 0){
-        //             s', c' := s1, Seq(c1, c);
-        //         } else {
-        //             s', c' := s1, Skip;
-        //         }
-        //         assert typeOK(s');
-        //         assert k >= 1;
-        //     case Seq(c1, c2) => // sequential composition
-        //         match c1 {
-        //             case Skip => 
-        //                 var p := TransitionSmallStep(s1, Seq(Skip, c2)); // removing the first Skip takes 1 step
-        //                 s', c' := p.0, p.1;
-        //                 TransitionSmallStepTypeOK(s1, c, s', c');
-        //                 assert typeOK(s');
-        //                 assert k >= 1;
-        //             case _ => 
-        //                 var (s3, c3) := TransitionSmallStep(s1, c1); 
-        //                 s', c' := s3, Seq(c3, c2);
-        //                 TransitionSmallStepTypeOK(s1, c, s', c');
-        //                 assert typeOK(s');
-        //                 assert k >= 1;
-        //         }
-        // }
-
         var p := TransitionSmallStep(s1, c);
         s', c' := p.0, p.1;
         TransitionSmallStepTypeOK(s1, c, s', c');
