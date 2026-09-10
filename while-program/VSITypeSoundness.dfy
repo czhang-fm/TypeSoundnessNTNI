@@ -162,7 +162,6 @@ module VSISoundness {
     // Finally, the Noninterference property is proved in the following lemma
     // ctx |- c /\ ctx |- s1 =Low= s2 /\ s1 ==>* s1' /\ s2 ==>* s2'
     // then ctx |- s1' =Low= s2'
-    // (Theorem 1 in the paper)
     lemma Noninterference(ctx: Context, s1: MState, s2: MState, c: Cmd, 
             s1': MState, s2': MState, k1: int, k2: int)
     requires ctx.Keys == s1.Keys == s2.Keys == s1'.Keys == s2'.Keys

@@ -1,14 +1,4 @@
-/* We start with the syntax and semantics for a simple while-language:
- * This version of semantics for the while-language follows the revised presentation in 
- * Geoffrey Smith: Principles of Secure Information Flow Analysis. (2007)
- * In: Christodorescu, M., Jha, S., Maughan, D., Song, D., Wang, C. (eds) Malware Detection. 
- * Advances in Information Security, vol 27. Springer, Boston, MA. https://doi.org/10.1007/978-0-387-44599-1_13
- * 
- * This version of the VSI type system is based on the small-step operational semantics (SOS) instead of the 
- * big-step operational semantics in the original paper (Dennis Volpano, Geoffrey Smith, and Cynthia Irvine. 
- * A sound type system for secure flow analysis. Journal of Computer Security, 4(2,3):167–187, 1996.)
- *
- * The syntax of the while-language should be self-explained.
+/* We start with the syntax and semantics for the simple while language 
  */
 module WhileProgram{
     // The type for all variables
@@ -58,7 +48,6 @@ module WhileProgram{
             case Seq(c1, c2) => VariablesInCmd(c1) + VariablesInCmd(c2)
         }
     }
-    // evaluate an expression in the current state s
     function Evaluate(s: MState, e: Expr) : int
     requires typeOK(s) && VariablesInExpr(e) <= s.Keys
     {
@@ -96,7 +85,6 @@ module WhileProgram{
         }
         
     }
-    // A test method
     method AssignmentTest(s: MState, x: Variable, y: Variable, value: int)
     requires typeOK(s) && x in s.Keys && y in s.Keys && x != y
     {
@@ -112,7 +100,7 @@ module WhileProgram{
         assert s4[x] == s3[x] == value;
         assert s4[y] == s4[x] * 2 == value * 2; // x == value, y == value * 2
         var (s5, c5) := TransitionSmallStep(s4, Seq(Assn(x, Var(y)), Skip));
-        // The next two steps are what we need to remind Dafny for inductive steps in our proof.
+        // The next two steps are what we need to remind Dafny for inductive cases in our proof.
         var (s5', c5') := TransitionSmallStep(s4, Assn(x, Var(y)));
         assert s5 == s5';
         assert s5'[y] == value *2;
@@ -127,28 +115,30 @@ module WhileProgram{
     ensures s.Keys == s'.Keys
     ensures typeOK(s') && VariablesInCmd(c') <= s'.Keys
     {}
-    predicate EmptyCmd(c: Cmd) // skip 
+    predicate EmptyCmd(c: Cmd)
     {
         match c
         case Skip => true
         case _ => false
     }
 
-    // Next we define whether a program terminates within n steps of transitions from one state to another
+    // Next we define how a program terminates within n steps of transitions
     predicate Terminates(c: Cmd, s: MState, s': MState, n: int)
     requires typeOK(s) && typeOK(s') && n >= 0
     requires VariablesInCmd(c) <= s.Keys == s'.Keys
     decreases n
     {
         match c {
-            case Skip => s == s' // && n >= 0
+            case Skip => s == s' && n == 0
             case _ => 
                 var (s1, c1) := TransitionSmallStep(s, c); 
+                TransitionSmallStepTypeOK(s, c, s1, c1);
+                // assert !EmptyCmd(c);
                 n >= 1 && Terminates(c1, s1, s', n-1)
         }
     }
-    // If a program terminates within k steps, then after one small step, the remaining program terminates k-1 steps
-    // The proof of this lemma is simplified by using the TransitionSmallStep function.
+    // One step termination: after a small step, the remaining program terminates
+    // The proof of this lemma may be significantly simplified ... later
     lemma {:induction false} SmallStepTermination(s1: MState, s2: MState, c: Cmd, k: int) returns (s': MState, c': Cmd)
     requires typeOK(s1) && typeOK(s2) && k >= 0
     requires VariablesInCmd(c) <= s1.Keys == s2.Keys
@@ -159,6 +149,50 @@ module WhileProgram{
     ensures VariablesInCmd(c') <= s'.Keys == s2.Keys
     ensures Terminates(c', s', s2, k-1)
     {
+        // match c {
+        //     case Skip => // already termination
+        //         assert false;
+        //     case Assn(x, e) => // assignment
+        //         s', c' := s1[x:= Evaluate(s1, e)], Skip;
+        //         assert typeOK(s');
+        //         assert VariablesInCmd(c') <= s'.Keys == s2.Keys;
+        //         assert k >= 1;
+        //         assert Terminates(c', s', s2, k-1); assert s2 == s';
+        //     case If(e, c1, c2) => // if-then-else
+        //         var res := Evaluate(s1, e);
+        //         if (res != 0){
+        //             s', c' := s1, c1;
+        //         } else {
+        //             s', c' := s1, c2;
+        //         }
+        //         assert typeOK(s');
+        //         assert k >= 1;
+        //     case While(e, c1) => // while-loop
+        //         var res := Evaluate(s1, e);
+        //         if (res != 0){
+        //             s', c' := s1, Seq(c1, c);
+        //         } else {
+        //             s', c' := s1, Skip;
+        //         }
+        //         assert typeOK(s');
+        //         assert k >= 1;
+        //     case Seq(c1, c2) => // sequential composition
+        //         match c1 {
+        //             case Skip => 
+        //                 var p := TransitionSmallStep(s1, Seq(Skip, c2)); // removing the first Skip takes 1 step
+        //                 s', c' := p.0, p.1;
+        //                 TransitionSmallStepTypeOK(s1, c, s', c');
+        //                 assert typeOK(s');
+        //                 assert k >= 1;
+        //             case _ => 
+        //                 var (s3, c3) := TransitionSmallStep(s1, c1); 
+        //                 s', c' := s3, Seq(c3, c2);
+        //                 TransitionSmallStepTypeOK(s1, c, s', c');
+        //                 assert typeOK(s');
+        //                 assert k >= 1;
+        //         }
+        // }
+
         var p := TransitionSmallStep(s1, c);
         s', c' := p.0, p.1;
         TransitionSmallStepTypeOK(s1, c, s', c');
@@ -168,6 +202,7 @@ module WhileProgram{
         assert VariablesInCmd(c') <= s'.Keys == s2.Keys;
         assert Terminates(c', s', s2, k-1);
     }
+
     // Multiple steps termination for sequential composition
     lemma {:induction false} Sequencing(s1: MState, s2: MState, c1: Cmd, c2: Cmd, k: int) returns (s': MState, k': int)
     requires typeOK(s1) && typeOK(s2) && k >= 0
@@ -182,7 +217,7 @@ module WhileProgram{
     ensures Terminates(c2, s', s2, k - k'-1)
     decreases k, c1, c2
     {
-        if (EmptyCmd(c1)){ // c1 == Skip // the base case:
+        if (EmptyCmd(c1)){ // c1 == Skip // the base case
             s' := s1; 
             k' := 0;
             assert typeOK(s');
@@ -195,7 +230,6 @@ module WhileProgram{
             TransitionSmallStepTypeOK(s1, Seq(c1, c2), s3, Seq(c3, c2));
             assert Terminates(Seq(c3, c2), s3, s2, k-1);
             assert typeOK(s3);
-            // the induction step:
             var s4, k2 := Sequencing(s3, s2, c3, c2, k-1);
             assert Terminates(c3, s3, s4, k2); 
             assert Terminates(c1, s1, s4, k2 + 1);

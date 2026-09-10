@@ -2,9 +2,9 @@ include "WhileProgram.dfy"
 
 /** This file defines the Nontransitive Noninterference type system
  *  which is proved to be sound for secure informaiton flow in 
- *  the while-loop programming language */
+ *  the While-loop programming language */
 
-module NontransitiveFlow{
+module NontransitiveFlowType{
     import opened WhileProgram
 
     // The security labels
@@ -15,18 +15,19 @@ module NontransitiveFlow{
     
     // An initial labelling on variables
     // Intuitively, an "unimportant" variable may be labelled by \top 
-    // which may (1) influence any other labels, and may (2) accept information in-flow from any other labels
+    // which may (1) influence any other labels, and (2) may accept information in-flow from any other labels
     const coarse_label: map<Variable, Label>
     predicate policyTypeOK(){
         && coarse_label.Keys == variables
-        && (forall l :: l in labels ==> (l, l) in flow) // the flow relation is reflexive !!!
+        && (forall l :: l in labels ==> (l, l) in flow) // the flow relation is reflexive 
         && forall x :: x in variables ==> coarse_label[x] in labels
     }
 
-    // Defines the set of labels that can interfere with a label
+    // The set of labels that can interfere with a label
     function CanFlow(l: Label): set<Label>
     requires l in labels
-    ensures forall l':: l' in labels ==> ((l',l) in flow <==> l' in CanFlow(l))
+    ensures forall l':: l' in labels && (l',l) in flow ==> l' in CanFlow(l)
+    ensures forall l':: l' in CanFlow(l) ==> (l', l) in flow
     ensures CanFlow(l) <= labels
     {
         (set l' | l' in labels && (l', l) in flow :: l')
@@ -41,7 +42,7 @@ module NontransitiveFlow{
     type VContext = map<Variable, BaseType>
     predicate validContext(vctx: VContext){
         // extending the domain of ctx.Keys to any variable(s)
-        // ensuring that vctx is reflexive and transitive 
+        // ensuring that vctx is reflexive and transitive -- maybe too specialized ???
         && vctx.Keys == variables 
         && policyTypeOK()
         && (forall x :: x in vctx.Keys ==> vctx[x] <= variables)
@@ -57,7 +58,7 @@ module NontransitiveFlow{
             case CmdType(t') => t'
         }
     }
-    // The meet and join are now set based operators: set unionism for Join, and set intersection for Meet. 
+    // The meet and join are now set based operators: set unionism for Join, and set intersection for Meet.
     function Join(t1: BaseType, t2: BaseType) : BaseType
     {
         t1 + t2
@@ -66,7 +67,7 @@ module NontransitiveFlow{
     {
         t1 * t2
     }
-
+    
     // Test cases: 
     // (1) for all labels l, l is in the set of labels in CanFlow(l)
     // (2) the set of labels generated from a BaseType (a set of variables)
@@ -103,12 +104,13 @@ module NontransitiveFlow{
             case Plus(e1, e2) => 
                 var t1 := HasExprType(vctx, e1); 
                 var t2 := HasExprType(vctx, e2); 
+                // if t1 == Invalid || t2 == Invalid then Invalid // this will never happen
                 ExprType(Join(GetBaseType(t1), GetBaseType(t2)))
         }
     }
     // The type checking process for a command/statement
     // If type checking fails the return type will be Invalid
-    // If type checking succeeds, it will return the set of variables (wrapped in a CmdType) that may be updated (modified) if cmd is run
+    // If type checking succeeds, it will return the set of variables (wrapped in a CmdType) updated in the cmd execution
     function HasCmdType(vctx: VContext, vpc: set<Variable>, c:Cmd): PhraseType
     requires policyTypeOK() && validContext(vctx)
     requires vpc <= variables
@@ -135,6 +137,7 @@ module NontransitiveFlow{
                 else Invalid
             case If(e, c1, c2) => 
                 var te := HasExprType(vctx, e);
+                // assert forall y :: y in vctx ==> vctx[y] <= v;
                 var t1 := HasCmdType(vctx, vpc + GetBaseType(te), c1); 
                 var t2 := HasCmdType(vctx, vpc + GetBaseType(te), c2);
                 if t1 == Invalid || t2 == Invalid then Invalid
@@ -150,7 +153,7 @@ module NontransitiveFlow{
                 else CmdType(Join(GetBaseType(t1), GetBaseType(t2)))
         }
     }
-
+ 
     /// reflexivity and transitivity in an assignment: x := e
     // (1) All information contained in e must also be contained in x, in the way that
     //     if y appears in e, then vctx[y] <= vctx[x]
@@ -175,4 +178,29 @@ module NontransitiveFlow{
     requires HasCmdType(vctx, vpc, If(e, c1, c2)) != Invalid
     ensures HasCmdType(vctx, vpc + GetBaseType(HasExprType(vctx, e)), c1) != Invalid
     {}
+    /// Reflexivity and transitivity for vpc and vctx[x] for all x updated in the program, 
+    /// This needs to hold for all c that passes type checking
+    lemma ReflTrans(vctx: VContext, vpc: set<Variable>, c:Cmd)
+    requires policyTypeOK() && validContext(vctx)
+    requires vpc <= variables
+    requires VariablesInCmd(c) <= vctx.Keys 
+    requires forall x :: x in vctx.Keys ==> vctx[x] <= variables
+    requires forall y :: y in vpc ==> vctx[y] <= vpc // this should hold as an IH
+    requires HasCmdType(vctx, vpc, c) != Invalid
+    ensures forall x :: x in GetBaseType(HasCmdType(vctx, vpc, c)) ==> x in vctx[x]
+    ensures forall x, y :: x in GetBaseType(HasCmdType(vctx, vpc, c)) && y in vctx[x] ==> vctx[y] <= vctx[x]
+    decreases c
+    {
+        match c {
+            case Skip => // termination, trivial
+            case Assn(x, e) => // assignment
+                assert {x} == GetBaseType(HasCmdType(vctx, vpc, c));              
+            case If(e, c1, c2) => // if-then-else
+                var vpce := GetBaseType(HasExprType(vctx, e));
+                assert forall y :: y in vpce ==> vctx[y] <= vpce;
+                ReflTrans(vctx, vpc + vpce, c1);
+            case While(e, c1) => // while-loop
+            case Seq(c1, c2) => // sequential composition
+        }
+    }
 }
