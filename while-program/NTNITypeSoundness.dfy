@@ -111,6 +111,8 @@ module NTNISoundness {
         assert s1'[x] == s2'[x];
     }
     // The following lemmas form the centre of the proof. 
+    // Suppose v is a variable, MaxSet(v) is the set of variables that may influcence v   
+    // Then we can treat MaxSet(v) as the set of variables of Low level, which should not be influenced by all the other variables
     function MaxSet(vctx: VContext, vpc: set<Variable>, c:Cmd, vset: set<Variable>): set<Variable>
     requires vset <= variables 
     requires validContext(vctx)
@@ -171,7 +173,7 @@ module NTNISoundness {
                     assert GetBaseType(HasCmdType(vctx, vpc, c)) <= vset;
                     EquivEval(vctx, vpce, s1, s2, e);
                     assert Evaluate(s1, e) == Evaluate(s2, e);
-                } else { // LocalUpdate(VContext, set<Variable>, BaseType, BaseType, s1: MState, s2: MState, n: int, c: Cmd)
+                } else { // values in vset remain the same
                     LocalUpdate(vctx, vpc, vset, {x}, s1, s1', k1, c);
                     LocalUpdate(vctx, vpc, vset, {x}, s2, s2', k2, c);
                     assert Equiv(vctx, vset, s1', s2');
@@ -184,7 +186,6 @@ module NTNISoundness {
                     assert vpce <= vctx[x];
                     assert vpce <= vset; 
                     assert Equiv(vctx, vpce, s1, s2);
-                    // // EquivEval(vctx: VContext, g: BaseType, s1: MState, s2: MState, e: Expr)
                     EquivEval(vctx, vpce, s1, s2, e);
                     assert Evaluate(s1, e) == Evaluate(s2, e);
                     var res := Evaluate(s1, e);
@@ -233,5 +234,30 @@ module NTNISoundness {
                 MaxSetConsistency(vctx, vpc, vset, s1, s2, s12, s22, k12, k22, c1);
                 MaxSetConsistency(vctx, vpc, vset, s12, s22, s1', s2', k1-k12-1, k2-k22-1, c2);
         }
+    }
+    // The NTNI security by NTNI type system (Theorem 2 in the paper)
+    lemma {:induction false} Noninterference(vctx: VContext,
+                               l: Label, 
+                              s1: MState, s2: MState, s1': MState, s2': MState, 
+                              k1: int, k2: int, c:Cmd)
+    requires vctx.Keys == s1.Keys == s2.Keys == s1'.Keys == s2'.Keys 
+    requires l in labels
+    requires validContext(vctx)
+    requires forall x :: x in variables && coarse_label[x] == l ==> x in vctx.Keys // the set of variables that has the label l
+    requires typeOK(s1) && typeOK(s2) && typeOK(s1') && typeOK(s2')
+    requires VariablesInCmd(c) <= vctx.Keys 
+    requires HasCmdType(vctx, {}, c) != Invalid // c passes type checking
+    requires Equiv(vctx, (set x | x in variables && coarse_label[x] in CanFlow(l) :: x), s1, s2)
+    requires k1 >= 0 && Terminates(c, s1, s1', k1)
+    requires k2 >= 0 && Terminates(c, s2, s2', k2)
+    ensures Equiv(vctx, (set x | x in variables && coarse_label[x] == l :: x), s1', s2')
+    {
+        var maxVars := MaxSet(vctx, {}, c, (set x | x in variables && coarse_label[x] == l :: x));
+        assert (set x | x in variables && coarse_label[x] == l :: x) <= maxVars;
+        assert maxVars <= (set x | x in variables && coarse_label[x] in CanFlow(l) :: x);
+        assert forall x, y :: x in maxVars && y in vctx[x] ==> y in maxVars; 
+        EquivalentStates(vctx, maxVars, (set x | x in variables && coarse_label[x] in CanFlow(l) :: x), s1, s2);
+        assert Equiv(vctx, maxVars, s1, s2); 
+        MaxSetConsistency(vctx, {}, maxVars, s1, s2, s1', s2', k1, k2, c);
     }
 }
